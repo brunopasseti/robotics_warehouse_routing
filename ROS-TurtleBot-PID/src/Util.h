@@ -51,7 +51,7 @@ int ControlVelocities(
 		{
 			// cmd_vel_yaw = 0;
 			cmd_vel_yaw = K_YAW * yaw_error;
-			cmd_vel_x = 1;
+			cmd_vel_x = 0.5;
 			return 1;
 		}
 		else {
