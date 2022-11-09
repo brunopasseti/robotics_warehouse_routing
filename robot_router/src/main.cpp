@@ -1,3 +1,6 @@
+#include <TagCoordinates.h>
+#include <ros/ros.h>
+#include <tb3_control/CoordinateGoal.h>
 #include <algorithm>
 #include <climits>
 #include <fstream>
@@ -5,11 +8,8 @@
 #include <vector>
 #include "Util.h"
 #include "readData.h"
-
 using namespace std;
 
-double** matrizAdj;	 // matriz de adjacencia
-int dimension;		 // quantidade total de vertices
 int tamanhoSolucao;
 const int iteracoesMaxima = 50;
 int counterSwaps[iteracoesMaxima] = {0},
@@ -29,16 +29,22 @@ struct tLocais {
 };
 
 int GenerateRandomNumber(int tamanho);
-void printData();
+void printData(int dimension, double** matrizAdj);
 void MelhorInsercao(vector<int>& solucao,
 					int escolhido,
 					vector<tLocais>& melhorDistancia,
-					vector<int>& conjuntoLocais);
+					vector<int>& conjuntoLocais,
+					int dimension,
+					double** matrizAdj);
 void ExcluirValorEscolhido(vector<int>& conjuntoDeLocais, int localInsercao);
 void InsercaoMaisBarata(vector<int>& conjuntoDeLocais,
 						vector<int>& solucao,
-						vector<tLocais>& melhorCaminho);
-void Limitar_Variacoes_Dos_Indices(int& indiceInicial, int& indiceFinal);
+						vector<tLocais>& melhorCaminho,
+						int dimension,
+						double** matrizAdj);
+void Limitar_Variacoes_Dos_Indices(int& indiceInicial,
+								   int& indiceFinal,
+								   int dimension);
 void EscreverResultadosNosArquivos(fstream& File,
 								   int* counters,
 								   int iteracoesMaxima,
@@ -46,32 +52,47 @@ void EscreverResultadosNosArquivos(fstream& File,
 void VerificarLimitesParaIndices(int& indiceInicial1,
 								 int& indiceFinal1,
 								 int& indiceInicial2,
-								 int& indiceFinal2);
+								 int& indiceFinal2,
+								 int dimension,
+								 double** matrizAdj);
 bool Ordena(tLocais a, tLocais b);
 double Algoritmo_RVND(vector<int>& solucao,
 					  double distancia,
-					  int interacaoNoMomento);
-double Reinsertion(vector<int>& solucao, double distancia, int tamanho);
-double Swap(vector<int>& solucao, double distancia);
-double Two_OPT(vector<int>& solucao, double distancia);
-double DoubleBridge_Pertubation(vector<int>& solucao, double distancia);
+					  int interacaoNoMomento,
+					  int dimension,
+					  double** matrizAdj);
+double Reinsertion(vector<int>& solucao,
+				   double distancia,
+				   int tamanho,
+				   int dimension,
+				   double** matrizAdj);
+double Swap(vector<int>& solucao,
+			double distancia,
+			int dimension,
+			double** matrizAdj);
+double Two_OPT(vector<int>& solucao,
+			   double distancia,
+			   int dimension,
+			   double** matrizAdj);
+double DoubleBridge_Pertubation(vector<int>& solucao,
+								double distancia,
+								int dimension,
+								double** matrizAdj);
 //+++++++++++++++++++++++++++++ ROBOTICA ++++++++++++++++++++++++++++++++++++++
-
-//+++++++++++++++++++++++++++++++ MAIN ++++++++++++++++++++++++++++++++++++++++
-
-int main(int argc, char** argv) {
-	readData(argc, argv, &dimension, &matrizAdj);
-	// printData();
-	tamanhoSolucao = dimension + 1;
-
-	srand((unsigned)time(0));
-
+ros::Publisher tsp_pub;
+ros::Subscriber points_sub;
+std::vector<geometry_msgs::Point32> pontos;
+bool tag_msg_received = false;
+void pointsCallback(const robot_router::TagCoordinates tag_msg) {
+	pontos = tag_msg.tagCoordinates;
+	tag_msg_received = true;
+	return;
+}
+//+++++++++++++++++++++++++++++ ILS-RVND ++++++++++++++++++++++++++++++++++++++
+std::vector<int> ils_rvnd(int dimension, double** matrizAdj) {
 	vector<int> solucaoFinal;
 	vector<int> auxConjuntoDeNos;
 	int custoFinal = INT_MAX;
-
-	fstream fileSwap, fileReinsertion, fileReinsertion_2, fileReinsertion_3,
-		fileTwo_Opt, fileDoubleBridge;
 
 	for (int j = 2; j <= dimension; j++)
 		auxConjuntoDeNos.push_back(j);
@@ -82,7 +103,7 @@ int main(int argc, char** argv) {
 		vector<int> solucao{1, 1}, conjuntoDeLocais = auxConjuntoDeNos;
 		int tamanho, escolhido, distancia = 0,
 								quantidadeDeInsercoesIniciais = 2;
-		bool usados[solucao.size() + 1] = {};
+		std::vector<bool> usados = std::vector<bool>(solucao.size() + 1, false);
 
 		for (int j = 0; j < quantidadeDeInsercoesIniciais; j++) {
 			tamanho = conjuntoDeLocais.size();
@@ -99,14 +120,15 @@ int main(int argc, char** argv) {
 
 		while (!conjuntoDeLocais.empty()) {
 			vector<tLocais> melhorCaminho;
-			InsercaoMaisBarata(conjuntoDeLocais, solucao, melhorCaminho);
+			InsercaoMaisBarata(conjuntoDeLocais, solucao, melhorCaminho,
+							   dimension, matrizAdj);
 
 			tamanho = melhorCaminho.size();
 			int alfa = (rand() % 6);
 			int quantidade = ((alfa / 10.0) * tamanho) + 1;
 			int escolhaAleatoriaDoVertice = rand() % quantidade;
 
-			sort(melhorCaminho.begin(), melhorCaminho.end(), Ordena);
+			std::sort(melhorCaminho.begin(), melhorCaminho.end(), Ordena);
 
 			solucao.emplace(
 				solucao.begin() + melhorCaminho[escolhaAleatoriaDoVertice].i,
@@ -118,7 +140,7 @@ int main(int argc, char** argv) {
 				melhorCaminho[escolhaAleatoriaDoVertice].localInsercao);
 		}
 
-		distancia = Algoritmo_RVND(solucao, distancia, i);
+		distancia = Algoritmo_RVND(solucao, distancia, i, dimension, matrizAdj);
 		int iterMaxIls;
 		if (dimension >= 150) {
 			iterMaxIls = dimension / 2;
@@ -130,9 +152,10 @@ int main(int argc, char** argv) {
 			int novaDistancia = distancia;
 			vector<int> copiaSolucao = solucao;
 
-			novaDistancia =
-				DoubleBridge_Pertubation(copiaSolucao, novaDistancia);
-			novaDistancia = Algoritmo_RVND(copiaSolucao, novaDistancia, i);
+			novaDistancia = DoubleBridge_Pertubation(
+				copiaSolucao, novaDistancia, dimension, matrizAdj);
+			novaDistancia = Algoritmo_RVND(copiaSolucao, novaDistancia, i,
+										   dimension, matrizAdj);
 
 			if (novaDistancia < distancia) {
 				counterDoubleBridge[i]++;
@@ -153,11 +176,48 @@ int main(int argc, char** argv) {
 	}
 
 	double tempo_final_TSP = cpuTime() - tempo_inicial_TSP;
+	return solucaoFinal;
+}
+//+++++++++++++++++++++++++++++++ MAIN ++++++++++++++++++++++++++++++++++++++++
+int main(int argc, char** argv) {
+	// printData();
+	ros::init(argc, argv, "robot_router");
+	ros::NodeHandle nh("tsp");
+
+	tsp_pub = nh.advertise<tb3_control::CoordinateGoal>("tsp/output/goals", 1);
+	points_sub = nh.subscribe("tsp/input/points", 10, pointsCallback);
+	ros::Rate loop_rate(10);
+	while (ros::ok()) {
+		while (!tag_msg_received)
+			;
+
+		int dimension = pontos.size();
+		tamanhoSolucao = dimension + 1;
+		double** matrizAdj = (double**)malloc(sizeof(double*) * dimension);
+		for (int i = 0; i < dimension; i++) {
+			matrizAdj[i] = (double*)malloc(sizeof(double));
+			for (int j = 0; j < dimension; j++) {
+				matrizAdj[i][j] = sqrt(pow(pontos[i].x - pontos[j].x, 2) +
+									   pow(pontos[i].y - pontos[j].y, 2));
+				;
+			}
+		}
+
+		std::vector<int> solucao = ils_rvnd(dimension, matrizAdj);
+
+		for (int i = 0; i < dimension; i++) {
+			free(matrizAdj[i]);
+		}
+		free(matrizAdj);
+		srand((unsigned)time(0));
+		tag_msg_received = false;
+		ros::spinOnce();
+		loop_rate.sleep();
+	}
 
 	return 0;
 }
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ END MAIN
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++ END MAIN ++++++++++++++++++++++++++++++++++++++
 
 double VerificarOMelhor(double distancia, double novaDistancia) {
 	if (distancia < novaDistancia)
@@ -165,7 +225,7 @@ double VerificarOMelhor(double distancia, double novaDistancia) {
 	return distancia;
 }
 
-void printData() {
+void printData(int dimension, double** matrizAdj) {
 	cout << "dimension: " << dimension << endl;
 	for (size_t i = 1; i <= dimension; i++) {
 		for (size_t j = 1; j <= dimension; j++) {
@@ -192,7 +252,10 @@ void ExcluirValorEscolhido(vector<int>& conjuntoDeLocais, int localInsercao) {
 	}
 }
 
-double Swap(vector<int>& solucao, double distancia) {
+double Swap(vector<int>& solucao,
+			double distancia,
+			int dimension,
+			double** matrizAdj) {
 	tLocais melhorSwap;
 	melhorSwap.i = 0;
 	melhorSwap.localInsercao = 0;
@@ -230,7 +293,11 @@ double Swap(vector<int>& solucao, double distancia) {
 	return distancia;
 }
 
-double Reinsertion(vector<int>& solucao, double distancia, int tamanho) {
+double Reinsertion(vector<int>& solucao,
+				   double distancia,
+				   int tamanho,
+				   int dimension,
+				   double** matrizAdj) {
 	tLocais melhorReinsercao;
 	melhorReinsercao.distancia = 0;
 	int quantidadeDeIteracoes = tamanhoSolucao - tamanho;
@@ -299,14 +366,17 @@ double Reinsertion(vector<int>& solucao, double distancia, int tamanho) {
 
 void InsercaoMaisBarata(vector<int>& conjuntoDeLocais,
 						vector<int>& solucao,
-						vector<tLocais>& melhorCaminho) {
+						vector<tLocais>& melhorCaminho,
+						int dimension,
+						double** matrizAdj) {
 	vector<int> auxLocais = conjuntoDeLocais;
 	int tamanho, escolhido;
 
 	while (!auxLocais.empty()) {
 		tamanho = auxLocais.size();
 		escolhido = GenerateRandomNumber(tamanho);
-		MelhorInsercao(solucao, escolhido, melhorCaminho, auxLocais);
+		MelhorInsercao(solucao, escolhido, melhorCaminho, auxLocais, dimension,
+					   matrizAdj);
 		auxLocais.erase(auxLocais.begin() + escolhido - 1);
 	}
 }
@@ -314,7 +384,9 @@ void InsercaoMaisBarata(vector<int>& conjuntoDeLocais,
 void MelhorInsercao(vector<int>& solucao,
 					int escolhido,
 					vector<tLocais>& melhorDistancia,
-					vector<int>& conjuntoLocais) {
+					vector<int>& conjuntoLocais,
+					int dimension,
+					double** matrizAdj) {
 	tLocais local;
 	int distancia;
 
@@ -330,7 +402,10 @@ void MelhorInsercao(vector<int>& solucao,
 	}
 }
 
-double Two_OPT(vector<int>& solucao, double distancia) {
+double Two_OPT(vector<int>& solucao,
+			   double distancia,
+			   int dimension,
+			   double** matrizAdj) {
 	tLocais melhorTwo_OPT;
 	melhorTwo_OPT.distancia = 0;
 
@@ -370,7 +445,9 @@ double Two_OPT(vector<int>& solucao, double distancia) {
 
 double Algoritmo_RVND(vector<int>& solucao,
 					  double distancia,
-					  int interacaoNoMomento) {
+					  int interacaoNoMomento,
+					  int dimension,
+					  double** matrizAdj) {
 	vector<string> algoritmos{"swap", "reinsertion", "reinsertion-2",
 							  "reinsertion-3", "two_opt"};
 	vector<string> copiaAlgoritmos = algoritmos;
@@ -385,7 +462,7 @@ double Algoritmo_RVND(vector<int>& solucao,
 		if (algoritmos[escolhaDeAlgoritmoAleatoria] == "swap") {
 			double startTimeSwap = cpuTime();
 
-			novaDistancia = Swap(solucao, distancia);
+			novaDistancia = Swap(solucao, distancia, dimension, matrizAdj);
 
 			tempoTotalSwap += cpuTime() - startTimeSwap;
 		} else if (algoritmos[escolhaDeAlgoritmoAleatoria] == "reinsertion") {
@@ -393,7 +470,8 @@ double Algoritmo_RVND(vector<int>& solucao,
 			double startTimeReinsertion = cpuTime();
 
 			novaDistancia =
-				Reinsertion(solucao, distancia, tamanhoDeBlocosParaReinsercao);
+				Reinsertion(solucao, distancia, tamanhoDeBlocosParaReinsercao,
+							dimension, matrizAdj);
 
 			tempoTotalReinsertion += cpuTime() - startTimeReinsertion;
 		} else if (algoritmos[escolhaDeAlgoritmoAleatoria] == "reinsertion-2") {
@@ -401,7 +479,8 @@ double Algoritmo_RVND(vector<int>& solucao,
 			double startTimeReinsertion_2 = cpuTime();
 
 			novaDistancia =
-				Reinsertion(solucao, distancia, tamanhoDeBlocosParaReinsercao);
+				Reinsertion(solucao, distancia, tamanhoDeBlocosParaReinsercao,
+							dimension, matrizAdj);
 
 			tempoTotalReinsertion_2 += cpuTime() - startTimeReinsertion_2;
 
@@ -410,14 +489,15 @@ double Algoritmo_RVND(vector<int>& solucao,
 			double startTimeReinsertion_3 = cpuTime();
 
 			novaDistancia =
-				Reinsertion(solucao, distancia, tamanhoDeBlocosParaReinsercao);
+				Reinsertion(solucao, distancia, tamanhoDeBlocosParaReinsercao,
+							dimension, matrizAdj);
 
 			tempoTotalReinsertion_3 += cpuTime() - startTimeReinsertion_3;
 
 		} else if (algoritmos[escolhaDeAlgoritmoAleatoria] == "two_opt") {
 			double startTimeTwo_Opt = cpuTime();
 
-			novaDistancia = Two_OPT(solucao, distancia);
+			novaDistancia = Two_OPT(solucao, distancia, dimension, matrizAdj);
 
 			tempoTotalTwo_Opt += cpuTime() - startTimeTwo_Opt;
 		}
@@ -445,18 +525,21 @@ double Algoritmo_RVND(vector<int>& solucao,
 	return distancia;
 }
 
-double DoubleBridge_Pertubation(vector<int>& solucao, double distancia) {
+double DoubleBridge_Pertubation(vector<int>& solucao,
+								double distancia,
+								int dimension,
+								double** matrizAdj) {
 	vector<int> copiaDaSolucao;
 	int indiceInicial1 = (rand() % (dimension - 1)) + 1;
 	int indiceFinal1 = (rand() % (dimension - 1)) + 1;
 	int indiceInicial2 = (rand() % (dimension - 1)) + 1;
 	int indiceFinal2 = (rand() % (dimension - 1)) + 1;
 
-	Limitar_Variacoes_Dos_Indices(indiceInicial1, indiceFinal1);
-	Limitar_Variacoes_Dos_Indices(indiceInicial2, indiceFinal2);
+	Limitar_Variacoes_Dos_Indices(indiceInicial1, indiceFinal1, dimension);
+	Limitar_Variacoes_Dos_Indices(indiceInicial2, indiceFinal2, dimension);
 
 	VerificarLimitesParaIndices(indiceInicial1, indiceFinal1, indiceInicial2,
-								indiceFinal2);
+								indiceFinal2, dimension, matrizAdj);
 
 	if (indiceFinal1 + 1 != indiceInicial2 &&
 		indiceInicial1 != indiceFinal2 + 1) {
@@ -521,7 +604,9 @@ double DoubleBridge_Pertubation(vector<int>& solucao, double distancia) {
 	return distancia;
 }
 
-void Limitar_Variacoes_Dos_Indices(int& indiceInicial, int& indiceFinal) {
+void Limitar_Variacoes_Dos_Indices(int& indiceInicial,
+								   int& indiceFinal,
+								   int dimension) {
 	if (indiceFinal < indiceInicial) {
 		int aux = indiceFinal;
 		indiceFinal = indiceInicial;
@@ -552,7 +637,9 @@ void EscreverResultadosNosArquivos(fstream& File,
 void VerificarLimitesParaIndices(int& indiceInicial1,
 								 int& indiceFinal1,
 								 int& indiceInicial2,
-								 int& indiceFinal2) {
+								 int& indiceFinal2,
+								 int dimension,
+								 double** matrizAdj) {
 	if (indiceInicial1 <= indiceInicial2 && indiceInicial2 <= indiceFinal1) {
 		int quantidadeDeNosContidosEntreIndiceInicial2_IndiceFinal1 =
 			(indiceFinal1 - indiceInicial2) + 1;
