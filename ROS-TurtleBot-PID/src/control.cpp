@@ -36,11 +36,12 @@ double distanceConst = 0.5;
 double dt = 0.1, maxT = M_PI, minT = -M_PI, Kp = 0.3, Ki = 0.05, Kd = 0.01;
 double dtS = 0.1, maxS = maxSpeed, minS = 0.0, KpS = 0.08, KiS = 0.01,
        KdS = 0.005;
+bool msg_received = false;
 
 double getDistance(Point &p1, Point &p2);
 
-std::vector<double> goal_x {1,1,2};
-std::vector<double> goal_y {0,1,3};
+std::vector<double> goal_x ;
+std::vector<double> goal_y ;
 
 void odomCallback(const nav_msgs::Odometry odom_msg) {
   tf::pointMsgToTF(odom_msg.pose.pose.position, odom_pos);
@@ -64,6 +65,7 @@ void tspCallback(const tb3_control::CoordinateGoal tsp_msg) {
     goal_x.push_back(tsp_msg.coordinates[i].x);
     goal_y.push_back(tsp_msg.coordinates[i].y);
   }
+  msg_received = true;
 }
 
 int main(int argc, char **argv) {
@@ -101,6 +103,11 @@ int main(int argc, char **argv) {
   double odom_temp_y = 0;
   int control_ret = 2;
   double goal_yaw;
+
+  while(!msg_received){
+    ROS_INFO("Waiting msg from callback!");
+    ros::spinOnce();
+  }
 
   while (ros::ok() && goal_count < (int) goal_y.size()) {
     if (control_ret == 2) {
