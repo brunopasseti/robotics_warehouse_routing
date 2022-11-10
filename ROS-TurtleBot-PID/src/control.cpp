@@ -8,7 +8,9 @@ ISE, Indiana University
 #include "geometry.h"
 #include "pid.h"
 #include "ros/ros.h"
+
 #include "tb3_control/CoordinateGoal.h"
+
 #include "Util.h"
 #include <cmath>
 #include <nav_msgs/Odometry.h>
@@ -115,8 +117,7 @@ int main(int argc, char **argv) {
       odom_temp_x = odom_pos.x();
       odom_temp_y = odom_pos.y();
       goal_yaw = ComputeGoalYaw(odom_temp_x, odom_temp_y,
-                                       goal_x[goal_count], goal_y[goal_count]) +
-                        M_PI / 2;
+                                       goal_x[goal_count], goal_y[goal_count]);
     }
     ROS_INFO("%f", goal_yaw);
 

@@ -9,6 +9,16 @@
 #define K_YAW 1
 #define K_X 1
 
+double clip (double v, double lo, double hi)
+{
+	if (v < lo)
+		return lo;
+	if (v > hi)
+		return hi;
+	return v;
+}
+
+
 double ComputeGoalYaw(
 		double curr_x,
 		double curr_y,
@@ -16,7 +26,15 @@ double ComputeGoalYaw(
 		double goal_y
 		)
 {
-	return atan2(goal_y - curr_y, goal_x - curr_x);
+	double goal_yaw =  atan2(goal_y - curr_y, goal_x - curr_x) + M_PI / 2;
+
+	if (goal_yaw > M_PI)
+		return goal_yaw - 2 * M_PI;
+
+	if (goal_yaw <- M_PI)
+		return goal_yaw + 2 * M_PI;
+
+	return goal_yaw;
 }
 
 int ControlVelocities(
@@ -40,7 +58,8 @@ int ControlVelocities(
 
 	if (abs(yaw_error) > 0.05)
 	{
-		cmd_vel_yaw = K_YAW * yaw_error;
+		// cmd_vel_yaw = K_YAW * yaw_error;
+		cmd_vel_yaw = clip(K_YAW * yaw_error, -1, 1);
 		cmd_vel_x = 0;
 
 		return 0;
@@ -50,12 +69,14 @@ int ControlVelocities(
 		if (pos_error > 0.2)
 		{
 			// cmd_vel_yaw = 0;
-			cmd_vel_yaw = K_YAW * yaw_error;
+			// cmd_vel_yaw = K_YAW * yaw_error;
+			cmd_vel_yaw = clip(K_YAW * yaw_error, -1, 1);
 			cmd_vel_x = 0.5;
 			return 1;
 		}
 		else {
-			cmd_vel_yaw = K_YAW * yaw_error;
+			// cmd_vel_yaw = K_YAW * yaw_error;
+			cmd_vel_yaw = clip(K_YAW * yaw_error, -1, 1);
 			cmd_vel_x = 0;
 			return 2;
 		}
