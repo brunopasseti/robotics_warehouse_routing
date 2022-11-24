@@ -1,0 +1,5 @@
+geometry_msgs/Point32[] tagCoordinates
+---
+int32[] sequence
+---
+int32[] sequence
