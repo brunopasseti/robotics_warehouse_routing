@@ -10,6 +10,7 @@
 #include <vector>
 #include <iostream>
 #include "Graph.h"
+#include <tb3_control/CoordinateGoal.h>
 
 double Npoints = 0;
 std::vector<std::pair<double, double>> points;
@@ -29,6 +30,12 @@ int main (int argc, char **argv)
   // true causes the client to spin its own thread
   actionlib::SimpleActionClient<robot_router::TSPAction> ac("tsp", true);
 
+
+  ros::init(argc, argv, "publisher_control");
+  ros::NodeHandle n;
+  ros::Publisher pub = n.advertise<tb3_control::CoordinateGoal>("tb3_control_node/output/goals", 1);
+  ros::Rate loop_rate(0.5);
+  
   ROS_INFO("Waiting for action server to start.");
   // wait for the action server to start
   ac.waitForServer(); //will wait for infinite time
@@ -53,7 +60,6 @@ int main (int argc, char **argv)
         }
   }
 
-
   Graph graph(points.size());
   for (size_t i = 0; i < points.size(); i++){
     for (size_t j = 0; j < points.size(); j++)
@@ -72,7 +78,7 @@ int main (int argc, char **argv)
     matrix.push_back(response.distances);
     directions.push_back(response.directions);
   }
-  
+
   // send a goal to the action
   robot_router::TSPGoal goal;
 
@@ -83,24 +89,11 @@ int main (int argc, char **argv)
       goal.tagDistances.push_back(matrix[i][j]);
     }
   }
-
-  // goal.tagCoordinates.push_back(coordinate);
-  //   std::cout << coordinate << std::endl;
-  // coordinate.x = 5.0f;
-  // goal.tagCoordinates.push_back(coordinate);
-  //   std::cout << coordinate << std::endl;
-  // coordinate.y = -3.0f;
-  // goal.tagCoordinates.push_back(coordinate);
-  //   std::cout << coordinate << std::endl;
-  // coordinate.x = -4.0f;
-  // goal.tagCoordinates.push_back(coordinate);
-  // std::cout << coordinate << std::endl;
   
   ac.sendGoal(goal);
 
   //wait for the action to return
   bool finished_before_timeout = ac.waitForResult();
-
 
   if (finished_before_timeout)
   {
@@ -108,13 +101,36 @@ int main (int argc, char **argv)
     ROS_INFO("Action finished: %s",state.toString().c_str());
     auto result = ac.getResult();
 
-    std::string res = "Result: ";
-    for (size_t i = 0; i < result->sequence.size(); i++)
-    {
-      res = res + std::to_string(result->sequence[i]) + " ";
+    tb3_control::CoordinateGoal goals;
+    int previous = -1;
+    for (int index : result->sequence){
+      if(previous == -1){
+        previous = index;
+        continue;
+      }
+
+      for (size_t i = 0; i < directions[previous][index].size(); i++){
+        geometry_msgs::Point32 coordinate;
+        coordinate.x = points[directions[previous][index][i]].first - 5;
+        coordinate.y = points[directions[previous][index][i]].second - 5;
+        goals.coordinates.push_back(coordinate);
+      }
+      
+      previous = index;
     }
-    
-    ROS_INFO(res.c_str());
+    ROS_INFO("%.2lf %.2lf\n", goals.coordinates[0].x, goals.coordinates[0].y);
+    ROS_INFO("%.2lf %.2lf\n", goals.coordinates[1].x, goals.coordinates[1].y);
+
+    while(ros::ok()){
+      if(goals.coordinates.size() > 1){
+        pub.publish(goals);
+        goals.coordinates.clear();
+
+      }
+      ros::spinOnce();
+      loop_rate.sleep();
+    }
+
   }
   else
     ROS_INFO("Action did not finish before the time out.");

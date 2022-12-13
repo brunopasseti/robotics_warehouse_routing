@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
       n.advertise<visualization_msgs::Marker>("visualization_marker", 1);
 
   odom_sub = n.subscribe("odom", 10, odomCallback);
-  tsp_sub = n.subscribe("tsp/output/goals", 10, tspCallback);
+  tsp_sub = n.subscribe("output/goals", 10, tspCallback);
   ros::Rate loop_rate(10); // ros spins 10 frames per second
 
   // we use geometry_msgs::twist to specify linear and angular speeds (v, w)
