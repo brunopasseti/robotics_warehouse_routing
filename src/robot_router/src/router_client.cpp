@@ -9,10 +9,10 @@
 #include <iostream>
 #include <vector>
 #include <iostream>
+#include "Graph.h"
 
 double Npoints = 0;
 std::vector<std::pair<double, double>> points;
-
 
 int main (int argc, char **argv)
 {
@@ -54,7 +54,25 @@ int main (int argc, char **argv)
   }
 
 
-
+  Graph graph(points.size());
+  for (size_t i = 0; i < points.size(); i++){
+    for (size_t j = 0; j < points.size(); j++)
+    {
+      if((abs(points[i].first - points[j].first) + abs(points[i].second - points[j].second)) != 1 || i == j)
+        continue;
+      graph.addEdge(i, j, 1);
+    }
+  }
+  
+  vector<vector<double>> matrix;
+  vector<vector<vector<int>>> directions;
+  for (size_t i = 0; i < points.size(); i++)
+  {
+    auto response = graph.shortestPath(i);
+    matrix.push_back(response.distances);
+    directions.push_back(response.directions);
+  }
+  
   // send a goal to the action
   robot_router::TSPGoal goal;
   geometry_msgs::Point32 coordinate;
