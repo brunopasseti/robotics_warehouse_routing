@@ -3,11 +3,19 @@
 
 #include <cmath>
 #include "vector2D.h"
+#include <algorithm>
+#include <vector>
 
 #define YAW_ERROR_TOL 0.025
 #define POS_ERROR_TOL 0.1
 #define K_YAW 1
 #define K_X 1
+
+// takes as argument an angle in [-M_PI, M_PI]
+double WrapTwoPi(double angle)
+{
+	return angle < 0 ? 2 * M_PI + angle : angle;
+}
 
 double clip (double v, double lo, double hi)
 {
@@ -17,7 +25,6 @@ double clip (double v, double lo, double hi)
 		return hi;
 	return v;
 }
-
 
 double ComputeGoalYaw(
 		double curr_x,
@@ -31,7 +38,7 @@ double ComputeGoalYaw(
 	if (goal_yaw > M_PI)
 		return goal_yaw - 2 * M_PI;
 
-	if (goal_yaw <- M_PI)
+	if (goal_yaw < -M_PI)
 		return goal_yaw + 2 * M_PI;
 
 	return goal_yaw;
@@ -54,12 +61,24 @@ int ControlVelocities(
 	double pos_error = (goal_pos - curr_pos).getMagnitude();
 	double yaw_error = (curr_yaw - goal_yaw);
 
-	ROS_INFO("%f %f", pos_error, yaw_error);
+	double adjusted_curr_yaw = WrapTwoPi(curr_yaw);
+	double adjusted_goal_yaw = WrapTwoPi(goal_yaw);
+
+	std::vector<double> temp_v = {adjusted_goal_yaw - adjusted_curr_yaw,
+		adjusted_goal_yaw - adjusted_curr_yaw + 2 * M_PI,
+		adjusted_goal_yaw - adjusted_curr_yaw - 2 * M_PI};
+	std::vector<double> temp_v2 = {abs(temp_v[0]), abs(temp_v[1]), abs(temp_v[2])}; 
+
+	int idx_greatest = std::max_element(temp_v2.begin(), temp_v2.end()) - temp_v2.begin();
+
+	int rotate_sign = -1;
+	if (temp_v[idx_greatest] < 0)
+		rotate_sign = 1;
 
 	if (abs(yaw_error) > 0.05)
 	{
 		// cmd_vel_yaw = K_YAW * yaw_error;
-		cmd_vel_yaw = clip(K_YAW * yaw_error, -1, 1);
+		cmd_vel_yaw = clip(K_YAW * rotate_sign * abs(yaw_error), -1, 1);
 		cmd_vel_x = 0;
 
 		return 0;
@@ -84,4 +103,3 @@ int ControlVelocities(
 }
 
 #endif
-
