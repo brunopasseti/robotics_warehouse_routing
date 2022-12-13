@@ -1,4 +1,4 @@
-geometry_msgs/Point32[] tagCoordinates
+float32[] tagDistances
 ---
 int32[] sequence
 ---

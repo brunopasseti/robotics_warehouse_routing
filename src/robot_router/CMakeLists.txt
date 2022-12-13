@@ -44,7 +44,7 @@ find_package(catkin REQUIRED COMPONENTS tb3_control geometry_msgs actionlib acti
 # # Generate messages in the 'msg' folder
 add_message_files(
     FILES
-    TagCoordinates.msg
+    TagDistances.msg
 )
 
 # # Generate services in the 'srv' folder

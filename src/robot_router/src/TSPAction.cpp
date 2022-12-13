@@ -38,7 +38,7 @@ std::vector<int> TSPAction::ils_rvnd() {
 			distancia += matrizAdj[solucao[j]][solucao[j + 1]];
 		}
 
-		ROS_INFO("Construction started! Custo: %d", distancia);
+		//ROS_INFO("Construction started! Custo: %d", distancia);
 		while (!conjuntoDeLocais.empty()) {
 			std::vector<tLocais> melhorCaminho;
 			InsercaoMaisBarata(conjuntoDeLocais, solucao, melhorCaminho);
@@ -59,7 +59,7 @@ std::vector<int> TSPAction::ils_rvnd() {
 				conjuntoDeLocais,
 				melhorCaminho[escolhaAleatoriaDoVertice].localInsercao);
 		}
-		ROS_INFO("Construction ended!");
+		//ROS_INFO("Construction ended!");
 
 		distancia = Algoritmo_RVND(solucao, distancia, i);
 		int iterMaxIls;
@@ -73,14 +73,14 @@ std::vector<int> TSPAction::ils_rvnd() {
 			int novaDistancia = distancia;
 			std::vector<int> copiaSolucao = solucao;
 
-			ROS_INFO("Perturbation started!");
+			//ROS_INFO("Perturbation started!");
 			novaDistancia = DoubleBridge_Pertubation(
 				copiaSolucao, novaDistancia);
-			ROS_INFO("Perturbation ended!\nLocalSearch started!");
+			//ROS_INFO("Perturbation ended!\nLocalSearch started!");
 			novaDistancia = Algoritmo_RVND(copiaSolucao, novaDistancia, i);
-			ROS_INFO("LocalSearch ended!");
+			//ROS_INFO("LocalSearch ended!");
 			if (novaDistancia < distancia) {
-				ROS_INFO("Custo anterior: %d, Novo Custo: %d", distancia, novaDistancia);
+				//ROS_INFO("Custo anterior: %d, Novo Custo: %d", distancia, novaDistancia);
 				if (dimension >= 150) {
 					iterMaxIls = dimension / 2;
 				} else {
@@ -90,7 +90,7 @@ std::vector<int> TSPAction::ils_rvnd() {
 				solucao = copiaSolucao;
 			}
 		}
-		ROS_INFO("LocalSearch ended!");
+		//ROS_INFO("LocalSearch ended!");
 		if (distancia < custoFinal) {
 			solucaoFinal = solucao;
 			custoFinal = distancia;
@@ -341,8 +341,8 @@ double TSPAction::Algoritmo_RVND(std::vector<int>& solucao,
 		}
 
 		if (distancia > novaDistancia) {
-			if(novaDistancia < 0)
-				ROS_INFO("Novo custo %d, Vizinhança: %d", novaDistancia, (int) escolhaDeAlgoritmoAleatoria);
+			//if(novaDistancia < 0)
+			//	ROS_INFO("Novo custo %d, Vizinhança: %d", novaDistancia, (int) escolhaDeAlgoritmoAleatoria);
 		
 			distancia = novaDistancia;
 			copiaAlgoritmos = algoritmos;

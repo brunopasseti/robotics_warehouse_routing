@@ -75,16 +75,13 @@ int main (int argc, char **argv)
   
   // send a goal to the action
   robot_router::TSPGoal goal;
-  geometry_msgs::Point32 coordinate;
 
-  coordinate.z = 0;
   //std::cout << "points size:" << points.size() << std::endl;
 
-  for(int i = 0; i < points.size(); i++){
-    coordinate.x = points[i].first - 6;
-    coordinate.y = points[i].second - 6;
-    std::cout << coordinate << std::endl;
-    goal.tagCoordinates.push_back(coordinate);
+  for(size_t i = 0; i < matrix.size(); i++){
+    for (size_t j = 0; j < matrix[i].size(); j++){
+      goal.tagDistances.push_back(matrix[i][j]);
+    }
   }
 
   // goal.tagCoordinates.push_back(coordinate);
@@ -104,7 +101,6 @@ int main (int argc, char **argv)
   //wait for the action to return
   bool finished_before_timeout = ac.waitForResult();
 
-  std::cout << "antes do fim" << std::endl;
 
   if (finished_before_timeout)
   {

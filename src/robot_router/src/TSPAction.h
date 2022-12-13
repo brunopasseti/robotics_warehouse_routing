@@ -6,6 +6,7 @@
 #include <robot_router/TSPAction.h>
 #include <iostream>
 #include <vector>
+#include <cmath>
 
 class TSPAction{
     protected:
@@ -66,20 +67,22 @@ class TSPAction{
 
         void executeCB(const robot_router::TSPGoalConstPtr &goal){
             success = true;
-            auto pontos = goal->tagCoordinates;
-            ROS_INFO("Instance dimension: %d", pontos.size());
-            dimension = pontos.size();
+            auto distances = goal->tagDistances;
+            dimension = int(sqrt(distances.size()));
+            ROS_INFO("Instance dimension: %d", dimension);
             tamanhoSolucao = dimension + 1;
 
             matrizAdj = std::vector<std::vector<double>>(dimension,std::vector<double>());
 
-            for (int i = 0; i < dimension; i++) {
+            int k = 0;
+            for (int i = 0; i < dimension; i++){
                 matrizAdj[i] = std::vector<double>(dimension);
-                for (int j = 0; j < dimension; j++) {
-                    matrizAdj[i][j] = abs(pontos[i].x - pontos[j].x) +
-                                        abs(pontos[i].y - pontos[j].y);
+                for (int j = 0; j < dimension; j++){
+                    matrizAdj[i][j] = distances[k];
+                    k++;
                 }
             }
+
 
             ROS_INFO("Optimization started!");
             result_.sequence = ils_rvnd();
